@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies.
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir -e ".[dev]"
+
+# Copy source code.
+COPY shared/ ./shared/
+COPY enclave_service/ ./enclave_service/
+
+# Expose port.
+EXPOSE 8001
+
+# Health check.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8001/health')" || exit 1
+
+# Run enclave service.
+CMD ["uvicorn", "enclave_service.main:app", "--host", "0.0.0.0", "--port", "8001"]

@@ -1,0 +1,42 @@
+[project]
+name = "compatibility"
+version = "0.1.0"
+description = "Privacy-preserving compatibility scoring system"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "pydantic-settings==2.1.0",
+    "redis==5.0.1",
+    "openai==1.3.0",
+    "cryptography==41.0.7",
+    "python-dotenv==1.0.0",
+    "requests>=2.32.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==7.4.3",
+    "pytest-asyncio==0.21.1",
+    "pytest-cov==4.1.0",
+    "httpx==0.25.2",
+    "faker==20.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["shared", "coordinator_service", "enclave_service"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=. --cov-report=term-missing"
+
+[tool.coverage.run]
+omit = ["tests/*", "**/__pycache__/*", ".venv/*"]

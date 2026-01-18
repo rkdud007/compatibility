@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: compatibility-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - compatibility-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile.coordinator
+    container_name: compatibility-coordinator
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENCLAVE_URL=http://enclave:8001
+    networks:
+      - compatibility-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  enclave:
+    build:
+      context: .
+      dockerfile: Dockerfile.enclave
+    container_name: compatibility-enclave
+    ports:
+      - "8001:8001"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - compatibility-network
+    restart: unless-stopped
+
+networks:
+  compatibility-network:
+    driver: bridge
