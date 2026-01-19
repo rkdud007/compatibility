@@ -4,7 +4,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from shared.schemas import EvaluateRequest, EvaluateResponse
 
-from enclave_service.evaluator import CompatibilityEvaluator
+from enclave.evaluator import CompatibilityEvaluator
 
 # Configure logging.
 logging.basicConfig(

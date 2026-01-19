@@ -98,8 +98,8 @@ def main():
         json={
             "user_id": "b",
             "conversations": convs_b,
-            "prompt": "Does this person will likely get cheesecake with me?",
-            "expected": "Yes, this person will likely get cheesecake with you",
+            "prompt": "Does this person likely to prioritize work over partner?",
+            "expected": "No, this person prioritize partner more",
         },
     )
     resp.raise_for_status()

@@ -27,7 +27,7 @@ class TestEndToEndFlow:
             TestClient instance.
         """
         from fastapi.testclient import TestClient
-        from coordinator_service.main import app
+        from coordinator.main import app
 
         return TestClient(app)
 
@@ -39,7 +39,7 @@ class TestEndToEndFlow:
             TestClient instance.
         """
         from fastapi.testclient import TestClient
-        from enclave_service.main import app
+        from enclave.main import app
 
         return TestClient(app)
 
@@ -71,8 +71,8 @@ class TestEndToEndFlow:
         """Test complete flow: create room → upload → ready → evaluate → results."""
 
         # Mock Redis and OpenAI for isolated test.
-        with patch("coordinator_service.routes.rooms.redis_client") as mock_redis, \
-             patch("enclave_service.main.evaluator") as mock_evaluator:
+        with patch("coordinator.routes.rooms.redis_client") as mock_redis, \
+             patch("enclave.main.evaluator") as mock_evaluator:
 
             # Configure mocks.
             mock_redis.create_room.return_value = "test-room-e2e"
@@ -224,8 +224,8 @@ class TestEndToEndFlow:
         logger.info("=" * 80)
 
         # Mock Redis and OpenAI for isolated test.
-        with patch("coordinator_service.routes.rooms.redis_client") as mock_redis, \
-             patch("enclave_service.main.evaluator") as mock_evaluator:
+        with patch("coordinator.routes.rooms.redis_client") as mock_redis, \
+             patch("enclave.main.evaluator") as mock_evaluator:
 
             # Configure mocks.
             mock_redis.create_room.return_value = "test-room-real-data"
@@ -399,7 +399,7 @@ class TestEndToEndFlow:
     ):
         """Test that users can upload but evaluation doesn't start until both ready."""
 
-        with patch("coordinator_service.routes.rooms.redis_client") as mock_redis:
+        with patch("coordinator.routes.rooms.redis_client") as mock_redis:
             mock_redis.create_room.return_value = "test-room-waiting"
             mock_redis.upload_user_data.return_value = True
 
@@ -436,7 +436,7 @@ class TestEndToEndFlow:
     def test_cannot_mark_ready_without_upload(self, coordinator_client):
         """Test that users cannot mark ready without uploading data first."""
 
-        with patch("coordinator_service.routes.rooms.redis_client") as mock_redis:
+        with patch("coordinator.routes.rooms.redis_client") as mock_redis:
             mock_redis.mark_user_ready.return_value = False
 
             response = coordinator_client.post(

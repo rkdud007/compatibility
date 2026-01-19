@@ -15,8 +15,8 @@ from shared.schemas import (
     RoomState,
 )
 
-from coordinator_service.config import settings
-from coordinator_service.redis_client import RedisClient
+from coordinator.config import settings
+from coordinator.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 

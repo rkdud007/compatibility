@@ -3,7 +3,7 @@
 import logging
 from typing import Tuple
 
-from enclave_service.openai_client import OpenAIClient
+from enclave.openai_client import OpenAIClient
 
 logger = logging.getLogger(__name__)
 

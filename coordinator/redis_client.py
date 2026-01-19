@@ -8,7 +8,7 @@ from uuid import uuid4
 import redis
 from shared.schemas import RoomData, RoomState, UserData, UserId, EvaluationResult
 
-from coordinator_service.config import settings
+from coordinator.config import settings
 
 
 class RedisClient:

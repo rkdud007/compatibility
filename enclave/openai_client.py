@@ -4,8 +4,8 @@ import logging
 from typing import List, Dict
 from openai import OpenAI
 
-from enclave_service.config import settings
-from enclave_service.conversation_parser import extract_messages_from_chatgpt_export
+from enclave.config import settings
+from enclave.conversation_parser import extract_messages_from_chatgpt_export
 
 logger = logging.getLogger(__name__)
 

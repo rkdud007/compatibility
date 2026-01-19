@@ -4,7 +4,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from coordinator_service.routes import rooms
+from coordinator.routes import rooms
 
 # Configure logging.
 logging.basicConfig(
