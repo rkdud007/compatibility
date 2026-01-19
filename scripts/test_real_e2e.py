@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Real E2E Test - No Mocking
+Real E2E Test 
+Note that this test will gonna use OPENAPI credit.
 Tests the complete compatibility flow using real Docker services and real OpenAI API.
 
 Usage:
     1. Start services: docker-compose up -d
-    2. Run test: python scripts/test_real_e2e.py
+    2. Run test: uv run scripts/test_real_e2e.py
 """
 
 import json
@@ -36,7 +37,7 @@ def main():
     enclave_url = "http://localhost:8001"
 
     log("\n" + "=" * 80, "cyan")
-    log("REAL E2E TEST - NO MOCKING", "bold")
+    log("REAL E2E TEST", "bold")
     log("=" * 80 + "\n", "cyan")
 
     # Wait for services.
@@ -83,8 +84,8 @@ def main():
         json={
             "user_id": "a",
             "conversations": convs_a,
-            "prompt": "Does this person value intellectual depth and meaningful conversations?",
-            "expected": "Yes",
+            "prompt": "Does this person likes to travel?",
+            "expected": "Yes, the person likes to travel",
         },
     )
     resp.raise_for_status()
@@ -97,8 +98,8 @@ def main():
         json={
             "user_id": "b",
             "conversations": convs_b,
-            "prompt": "Does this person enjoy philosophical discussions and self-reflection?",
-            "expected": "Yes",
+            "prompt": "Does this person will likely get cheesecake with me?",
+            "expected": "Yes, this person will likely get cheesecake with you",
         },
     )
     resp.raise_for_status()

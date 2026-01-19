@@ -50,7 +50,7 @@ class OpenAIClient:
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.3,  # Lower temperature for more consistent answers.
+            temperature=0.5,  # Moderate temperature for balanced reasoning and creativity.
             max_tokens=500,
         )
 
@@ -70,22 +70,32 @@ class OpenAIClient:
             Formatted context for system message.
         """
         context_lines = [
-            "You are analyzing a person's ChatGPT conversation history to answer questions about their personality, values, and preferences.",
+            "You are an insightful psychologist and personality analyst examining a person's ChatGPT conversation history.",
+            "Your task is to understand their personality, values, preferences, and behavioral patterns.",
             "",
-            "Below is their conversation history (filtered for relationship-relevant topics):",
+            "IMPORTANT INSTRUCTIONS:",
+            "- Make reasonable inferences based on conversation patterns, topics discussed, and tone.",
+            "- Read between the lines: if someone frequently discusses work/tech, they likely value achievement and learning.",
+            "- Consider indirect evidence: philosophical discussions suggest introspection, questions about relationships suggest social awareness.",
+            "- Synthesize multiple data points to form holistic personality assessments.",
+            "- Be confident in your analysis when patterns are clear, even if not explicitly stated.",
+            "- Only say 'Unable to determine' if there is truly NO relevant information or the patterns are contradictory.",
+            "",
+            "Below is their conversation history:",
             "",
         ]
 
-        # Add conversation excerpts (limit to avoid token overflow).
-        for conv in conversations[:50]:  # Limit to 50 most recent.
+        # Add conversation excerpts with more generous limits.
+        max_conversations = min(100, len(conversations))  # Increase to 100 for more context.
+        for conv in conversations[:max_conversations]:
             role = conv.get("role", "user")
-            content = conv.get("content", "")[:500]  # Truncate long messages.
+            content = conv.get("content", "")[:800]  # Increase to 800 chars per message.
             context_lines.append(f"[{role.upper()}]: {content}")
 
         context_lines.extend([
             "",
-            "Based ONLY on this conversation history, answer the following question concisely and directly.",
-            "If the conversation history doesn't provide enough information, say 'Unable to determine from available data'.",
+            "Based on this conversation history, answer the following question with thoughtful reasoning.",
+            "Make inferences about their personality traits, values, and likely behaviors based on the evidence above.",
         ])
 
         return "\n".join(context_lines)
