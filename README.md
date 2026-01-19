@@ -39,6 +39,7 @@ docker-compose down
 ### Run e2e test
 
 ```bash
+uv sync
 uv run scripts/test_real_e2e.py
 ```
 
