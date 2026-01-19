@@ -115,48 +115,6 @@ CREATED → WAITING_FOR_USERS → BOTH_UPLOADED → EVALUATING → COMPLETED
 
 Frontend polls `/room/{id}/status` to update UI based on current state.
 
-**Technology Stack:**
-
-**MVP (Current):**
-- Coordinator: FastAPI + Redis
-- Enclave: Docker container (Python + OpenAI API)
-- Encryption: Symmetric (shared secret via HTTPS)
-- Storage: Redis (1-hour TTL on rooms)
-
-**Production (Future):**
-- Coordinator: Same (no changes needed)
-- Enclave: TEE runtime (Gramine/Occlum/AWS Nitro)
-- Encryption: Asymmetric (enclave public key)
-- Attestation: Remote attestation endpoint
-- Storage: Same Redis (unchanged)
-
-**Migration Path:**
-
-The stateless, separated design means migrating to a real enclave only requires:
-1. Changing enclave runtime (Docker → TEE)
-2. Switching encryption (symmetric → asymmetric)
-3. Adding attestation endpoint
-4. **No changes to coordinator logic or API contracts**
-
-**Data Processing:**
-- Conversations filtered to relationship-related topics only
-- Agent operates only on provided conversation history (no external knowledge)
-- Scoring uses semantic similarity between agent response and expected answer
-
-**Lifecycle:**
-- Rooms are one-time pairings
-- Auto-created on first access to room URL
-- Auto-deleted after both users view results
-
-**MVP Simplifications:**
-- Room-based temporary identity (no persistent accounts)
-- No impersonation protection
-- ChatGPT export format only
-- Single custom prompt per user
-- Docker instead of TEE enclave (same code, different runtime)
-
-## Backend Setup & Development
-
 ### Quick Start
 
 **Prerequisites:**
@@ -164,65 +122,6 @@ The stateless, separated design means migrating to a real enclave only requires:
 - [UV package manager](https://github.com/astral-sh/uv)
 - Redis
 - OpenAI API key
-
-**1. Install dependencies:**
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv pip install -e ".[dev]"
-```
-
-**2. Generate encryption key:**
-```bash
-python scripts/generate_key.py
-```
-
-**3. Configure environment:**
-```bash
-cp .env.example .env
-# Edit .env with your OpenAI API key and generated encryption key
-```
-
-**4. Start services:**
-```bash
-# Terminal 1: Redis
-docker run -d -p 6379:6379 redis:7-alpine
-
-# Terminal 2: Coordinator service
-uvicorn coordinator_service.main:app --reload --port 8000
-
-# Terminal 3: Enclave service
-uvicorn enclave_service.main:app --reload --port 8001
-```
-
-**5. Test the API:**
-```bash
-curl http://localhost:8000/room/health
-curl http://localhost:8001/health
-```
-
-### Running Tests
-
-The project includes comprehensive tests covering all components:
-
-```bash
-# Run all tests with coverage
-bash scripts/run_tests.sh
-
-# Or run specific test suites
-pytest tests/test_encryption.py -v        # Encryption utilities
-pytest tests/test_schemas.py -v           # Data models
-pytest tests/test_redis_client.py -v      # Redis operations
-pytest tests/test_coordinator_api.py -v   # Coordinator API
-pytest tests/test_enclave_service.py -v   # Enclave service
-pytest tests/test_e2e.py -v               # End-to-end flow
-```
-
-**Test Coverage:**
-- Unit tests for shared components (encryption, schemas)
-- Integration tests for Redis client operations
-- API endpoint tests for both services
-- End-to-end flow tests for complete user journey
-- Mock-based tests to isolate external dependencies (Redis, OpenAI)
 
 ### Docker Deployment
 
@@ -234,58 +133,15 @@ docker-compose up --build
 docker-compose up -d
 
 # View logs
-docker-compose logs -f coordinator
-docker-compose logs -f enclave
+docker-compose logs -f compatibility-coordinator
+docker-compose logs -f compatibility-enclave
 
 # Stop services
 docker-compose down
 ```
 
-### API Examples
+### Run e2e test
 
-**Create a room:**
 ```bash
-curl -X POST http://localhost:8000/room/create
-# → {"room_id": "uuid", "invite_link": "http://..."}
+uv run scripts/test_real_e2e.py
 ```
-
-**Upload user data:**
-```bash
-curl -X POST http://localhost:8000/room/{room_id}/upload \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "a",
-    "encrypted_conversations": "...",
-    "encrypted_prompt": "...",
-    "encrypted_expected": "..."
-  }'
-```
-
-**Check status (polling):**
-```bash
-curl http://localhost:8000/room/{room_id}/status
-# → {"state": "BOTH_UPLOADED", "user_a_ready": true, "user_b_ready": false, "result": null}
-```
-
-**Mark ready (triggers evaluation when both ready):**
-```bash
-curl -X POST http://localhost:8000/room/{room_id}/ready \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": "a"}'
-```
-
-### Project Structure
-
-```
-compatibility/
-├── coordinator_service/    # Untrusted orchestration (FastAPI + Redis)
-├── enclave_service/        # Trusted evaluation (stateless Python)
-├── shared/                 # Shared schemas and encryption
-├── tests/                  # Comprehensive test suite
-├── scripts/                # Utility scripts
-├── docker-compose.yml      # Service orchestration
-└── DEVELOPMENT.md          # Detailed development guide
-```
-
-For more detailed development information, see [DEVELOPMENT.md](DEVELOPMENT.md).
-
