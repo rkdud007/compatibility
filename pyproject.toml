@@ -28,7 +28,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["shared", "coordinator_service", "enclave_service"]
+packages = ["shared", "coordinator", "enclave"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

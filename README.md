@@ -11,6 +11,37 @@ Instead of asking sensitive questions directly (which risks revealing private pr
 
 A ChatGPT agent evaluates compatibility by answering each user's custom prompt using only the other user's conversation history. The system calculates compatibility scores (0-100) based on how closely the agent's answers match the expected answers.
 
+### Quick Start
+
+**Prerequisites:**
+- Python 3.11+
+- [UV package manager](https://github.com/astral-sh/uv)
+- Redis
+- OpenAI API key
+
+### Docker Deployment
+
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Run in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f compatibility-coordinator
+docker-compose logs -f compatibility-enclave
+
+# Stop services
+docker-compose down
+```
+
+### Run e2e test
+
+```bash
+uv run scripts/test_real_e2e.py
+```
+
 ### How It Works
 
 ```bash
@@ -74,33 +105,3 @@ REAL E2E TEST
 ================================================================================
 ```
 
-### Quick Start
-
-**Prerequisites:**
-- Python 3.11+
-- [UV package manager](https://github.com/astral-sh/uv)
-- Redis
-- OpenAI API key
-
-### Docker Deployment
-
-```bash
-# Build and start all services
-docker-compose up --build
-
-# Run in background
-docker-compose up -d
-
-# View logs
-docker-compose logs -f compatibility-coordinator
-docker-compose logs -f compatibility-enclave
-
-# Stop services
-docker-compose down
-```
-
-### Run e2e test
-
-```bash
-uv run scripts/test_real_e2e.py
-```

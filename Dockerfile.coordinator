@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -e ".[dev]"
 
 # Copy source code.
 COPY shared/ ./shared/
-COPY coordinator_service/ ./coordinator_service/
+COPY coordinator/ ./coordinator/
 
 # Expose port.
 EXPOSE 8000
@@ -18,4 +18,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
 # Run coordinator service.
-CMD ["uvicorn", "coordinator_service.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "coordinator.main:app", "--host", "0.0.0.0", "--port", "8000"]
