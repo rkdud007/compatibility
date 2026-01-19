@@ -13,107 +13,66 @@ A ChatGPT agent evaluates compatibility by answering each user's custom prompt u
 
 ### How It Works
 
-**User Flow:**
+```bash
+compatibility on  main [✘?] is 📦 v0.1.0 via 🐍 v3.10.15 
+❯ uv run tests/test_real_e2e.py
 
-1. **Room Creation**
-   - User A clicks "Start" on the website
-   - System creates a unique room with shareable link
-   - User A receives custom room URL to share with User B
+================================================================================
+REAL E2E TEST
+================================================================================
 
-2. **Data Upload**
-   - User A accesses room, uploads:
-     - `conversations.json` (exported from ChatGPT)
-     - Custom prompt (e.g., "Does this person value honesty?")
-     - Expected answer (e.g., "yes")
-   - User B receives shared link, uploads same data structure
+[Setup] Waiting for services...
+  ✓ Coordinator ready
+  ✓ Enclave ready
 
-3. **Ready & Evaluation**
-   - Both users have a "Ready" button
-   - UI shows "Waiting for other person to be ready" until both click
-   - When both ready:
-     - Loading page appears
-     - ChatGPT agent evaluates compatibility (in isolated enclave)
-     - Agent answers User B's prompt using User A's conversations
-     - Agent answers User A's prompt using User B's conversations
-     - Calculates similarity scores (0-100)
+[Setup] Loading conversation files...
+  ✓ Loaded 4 conversations for User A
+  ✓ Loaded 3 conversations for User B
 
-4. **Results**
-   - Both users see the same public result page:
-     - A→B compatibility score (how well B matches A's expectations)
-     - B→A compatibility score (how well A matches B's expectations)
-   - Room is automatically deleted after results shown
-   - All conversation data is permanently deleted
+[Step 1] User A creates room
+  Room ID: 72d1ca23-42d6-41bb-80d1-2cf25581b0c9
 
-### Technical Architecture
+[Step 2] User A uploads data
+  ✓ User A data uploaded
 
-**Design Principle: Enclave-Ready from Day One**
+[Step 3] User B uploads data
+  ✓ User B data uploaded
 
-The system is designed for easy migration from Docker (MVP) to trusted execution environments (production). This is achieved through a strict separation between orchestration (untrusted) and computation (trusted).
+[Step 4] Check room status
+  State: BOTH_UPLOADED
+  User A ready: False
+  User B ready: False
 
-**Two-Service Architecture:**
+[Step 5] User A marks ready
+  ✓ User A is ready
 
+[Step 6] User B marks ready
+  ✓ User B is ready
+  → Evaluation triggered!
+
+[Step 7] Waiting for evaluation...
+  The evaluation performs 4 OpenAI API calls:
+    1/4: Answer A's prompt with B's conversations
+    2/4: Calculate A→B similarity score
+    3/4: Answer B's prompt with A's conversations
+    4/4: Calculate B→A similarity score
+  This typically takes 30-60 seconds total.
+
+  ⏳ Status: EVALUATING           ( 12s)..   ✓ Evaluation completed in 14s
+
+[Step 8] Results
+
+================================================================================
+✅ TEST PASSED - COMPATIBILITY RESULTS
+================================================================================
+
+  Room ID: 72d1ca23-42d6-41bb-80d1-2cf25581b0c9
+  A→B Compatibility: 40%
+  B→A Compatibility: 60%
+  Average: 50.0%
+
+================================================================================
 ```
-┌─────────────────────────────────────────────────────────┐
-│              Coordinator (Untrusted)                     │
-│  - Room state management (ready flags, completion)      │
-│  - Stores encrypted data blobs only                      │
-│  - Triggers evaluation when both users ready             │
-│  - Cannot read sensitive data                            │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│         Enclave Service (Trusted - Stateless)            │
-│  MVP: Docker Container | Production: TEE Enclave         │
-│                                                           │
-│  - Receives conversation data                            │
-│  - Processes in isolated memory                          │
-│  - Runs ChatGPT evaluation                               │
-│  - Returns only compatibility scores                     │
-│  - Zero data persistence                                 │
-└─────────────────────────────────────────────────────────┘
-```
-
-**API Design:**
-
-**Coordinator Service** (FastAPI + Redis)
-```
-POST   /room/create
-  → {room_id, invite_link}
-
-POST   /room/{id}/upload
-  Body: {user_id, conversations, prompt, expected}
-  → Stores raw conversation data
-
-POST   /room/{id}/ready
-  Body: {user_id}
-  → Auto-triggers enclave when both ready
-
-GET    /room/{id}/status
-  → {state, user_a_ready, user_b_ready, result}
-  → Frontend polls every 2-3 seconds for updates
-```
-
-**Enclave Service** (Stateless Python)
-```
-POST   /evaluate
-  Body: {user_a_conversations, user_a_prompt, user_a_expected, user_b_conversations, user_b_prompt, user_b_expected}
-  → Evaluates compatibility, returns scores
-  → No state, no logs, no persistence
-```
-
-**Data Flow & Privacy:**
-
-1. **Raw data upload** - Users upload conversation data directly (MVP mode - encryption can be added later)
-2. **Coordinator storage** - Coordinator stores data temporarily in Redis with TTL
-3. **Enclave isolation** - Sensitive data processed in enclave memory, never persisted
-4. **Automatic cleanup** - All data deleted after results shown
-
-**State Machine:**
-```
-CREATED → WAITING_FOR_USERS → BOTH_UPLOADED → EVALUATING → COMPLETED
-```
-
-Frontend polls `/room/{id}/status` to update UI based on current state.
 
 ### Quick Start
 
