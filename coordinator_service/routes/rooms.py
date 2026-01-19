@@ -1,5 +1,6 @@
 """Room management API routes."""
 
+import logging
 import httpx
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from shared.schemas import (
@@ -16,6 +17,8 @@ from shared.schemas import (
 
 from coordinator_service.config import settings
 from coordinator_service.redis_client import RedisClient
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/room", tags=["rooms"])
 redis_client = RedisClient()
@@ -70,18 +73,25 @@ async def trigger_evaluation(room_id: str) -> None:
     Args:
         room_id: Room identifier.
     """
+    logger.info(f"Starting evaluation for room {room_id}")
+
     room = redis_client.get_room(room_id)
     if not room or not (room.user_a.ready and room.user_b.ready):
+        logger.warning(f"Cannot evaluate room {room_id}: room not found or users not ready")
         return
 
     # Set state to EVALUATING.
     redis_client.set_evaluating(room_id)
+    logger.info(f"Room {room_id} state set to EVALUATING")
 
     try:
         # Call enclave service.
+        enclave_url = f"{settings.enclave_service_url}/evaluate"
+        logger.info(f"Calling enclave service at {enclave_url} for room {room_id}")
+
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                f"{settings.enclave_service_url}/evaluate",
+                enclave_url,
                 json=EvaluateRequest(
                     user_a_conversations=room.user_a.conversations,
                     user_a_prompt=room.user_a.prompt,
@@ -91,8 +101,11 @@ async def trigger_evaluation(room_id: str) -> None:
                     user_b_expected=room.user_b.expected,
                 ).model_dump(),
             )
+
+            logger.info(f"Enclave service responded with status {response.status_code} for room {room_id}")
             response.raise_for_status()
             result = EvaluateResponse.model_validate(response.json())
+            logger.info(f"Evaluation completed for room {room_id}: a_to_b={result.a_to_b_score}, b_to_a={result.b_to_a_score}")
 
         # Save result.
         from shared.schemas import EvaluationResult
@@ -104,9 +117,21 @@ async def trigger_evaluation(room_id: str) -> None:
                 b_to_a_score=result.b_to_a_score,
             ),
         )
+        logger.info(f"Results saved for room {room_id}")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Enclave service returned error for room {room_id}: {e.response.status_code} - {e.response.text}")
+        room = redis_client.get_room(room_id)
+        if room:
+            room.state = RoomState.BOTH_UPLOADED
+            redis_client.update_room(room)
+    except httpx.RequestError as e:
+        logger.error(f"Failed to connect to enclave service for room {room_id}: {e}")
+        room = redis_client.get_room(room_id)
+        if room:
+            room.state = RoomState.BOTH_UPLOADED
+            redis_client.update_room(room)
     except Exception as e:
-        # Log error and revert state (in production, would have proper error handling).
-        print(f"Evaluation failed for room {room_id}: {e}")
+        logger.error(f"Evaluation failed for room {room_id}: {e}", exc_info=True)
         room = redis_client.get_room(room_id)
         if room:
             room.state = RoomState.BOTH_UPLOADED

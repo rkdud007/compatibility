@@ -1,9 +1,17 @@
 """Coordinator service FastAPI application."""
 
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from coordinator_service.routes import rooms
+
+# Configure logging.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 app = FastAPI(
     title="Compatibility Coordinator Service",

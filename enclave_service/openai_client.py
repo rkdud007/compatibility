@@ -1,9 +1,13 @@
 """OpenAI client for GPT-based evaluation."""
 
+import logging
 from typing import List, Dict
 from openai import OpenAI
 
 from enclave_service.config import settings
+from enclave_service.conversation_parser import extract_messages_from_chatgpt_export
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIClient:
@@ -25,8 +29,19 @@ class OpenAIClient:
         Returns:
             GPT's answer based on the conversation context.
         """
+        # Parse ChatGPT export format if needed.
+        parsed_messages = extract_messages_from_chatgpt_export(conversations)
+
         # Build system message with conversation context.
-        system_message = self._build_context_message(conversations)
+        system_message = self._build_context_message(parsed_messages)
+
+        logger.debug("=" * 80)
+        logger.debug("PROMPT TO GPT:")
+        logger.debug(f"User prompt: {prompt}")
+        logger.debug(f"Raw conversations: {len(conversations)}")
+        logger.debug(f"Parsed messages: {len(parsed_messages)}")
+        logger.debug(f"System message (first 500 chars): {system_message[:500]}...")
+        logger.debug("=" * 80)
 
         # Call GPT API.
         response = self.client.chat.completions.create(
@@ -39,7 +54,11 @@ class OpenAIClient:
             max_tokens=500,
         )
 
-        return response.choices[0].message.content.strip()
+        answer = response.choices[0].message.content.strip()
+        logger.debug(f"GPT Response: {answer}")
+        logger.debug("=" * 80)
+
+        return answer
 
     def _build_context_message(self, conversations: List[Dict]) -> str:
         """Build context message from conversation history.
@@ -58,7 +77,7 @@ class OpenAIClient:
         ]
 
         # Add conversation excerpts (limit to avoid token overflow).
-        for i, conv in enumerate(conversations[:50]):  # Limit to 50 most recent.
+        for conv in conversations[:50]:  # Limit to 50 most recent.
             role = conv.get("role", "user")
             content = conv.get("content", "")[:500]  # Truncate long messages.
             context_lines.append(f"[{role.upper()}]: {content}")
@@ -96,6 +115,12 @@ Provide ONLY a number from 0-100 where:
 
 Your response should be ONLY the number, nothing else."""
 
+        logger.debug("=" * 80)
+        logger.debug("SIMILARITY SCORING:")
+        logger.debug(f"Actual answer: {answer}")
+        logger.debug(f"Expected answer: {expected}")
+        logger.debug("=" * 80)
+
         response = self.client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": similarity_prompt}],
@@ -103,12 +128,22 @@ Your response should be ONLY the number, nothing else."""
             max_tokens=10,
         )
 
+        raw_score = response.choices[0].message.content.strip()
+        logger.debug(f"Raw similarity score from GPT: {raw_score}")
+
         try:
-            score = int(response.choices[0].message.content.strip())
-            return max(0, min(100, score))  # Clamp to 0-100.
+            score = int(raw_score)
+            final_score = max(0, min(100, score))  # Clamp to 0-100.
+            logger.debug(f"Final similarity score: {final_score}")
+            logger.debug("=" * 80)
+            return final_score
         except ValueError:
+            logger.warning(f"Could not parse score '{raw_score}', using fallback")
             # Fallback: simple string matching if GPT doesn't return a number.
-            return self._fallback_similarity(answer, expected)
+            fallback = self._fallback_similarity(answer, expected)
+            logger.debug(f"Fallback similarity score: {fallback}")
+            logger.debug("=" * 80)
+            return fallback
 
     def _fallback_similarity(self, answer: str, expected: str) -> int:
         """Fallback similarity calculation using simple string matching.

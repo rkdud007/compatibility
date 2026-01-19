@@ -25,7 +25,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - ENCLAVE_URL=http://enclave:8001
+      - ENCLAVE_SERVICE_URL=http://enclave:8001
     networks:
       - compatibility-network
     depends_on:
