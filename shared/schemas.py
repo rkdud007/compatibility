@@ -23,13 +23,14 @@ class UserId(str, Enum):
 
 
 class UserData(BaseModel):
-    """User's data within a room."""
+    """User's public state within a room (coordinator-visible).
+
+    Note: Actual confidential data (conversations, prompt, expected) is stored
+    only in the enclave's secure storage, never in Redis.
+    """
 
     uploaded: bool = False
     ready: bool = False
-    conversations: Optional[list] = None
-    prompt: Optional[str] = None
-    expected: Optional[str] = None
 
 
 class EvaluationResult(BaseModel):
@@ -97,15 +98,21 @@ class StatusResponse(BaseModel):
     result: Optional[EvaluationResult] = None
 
 
-class EvaluateRequest(BaseModel):
-    """Request to enclave service for evaluation."""
+class SecureUploadRequest(BaseModel):
+    """Direct upload to enclave's secure storage."""
 
-    user_a_conversations: list
-    user_a_prompt: str
-    user_a_expected: str
-    user_b_conversations: list
-    user_b_prompt: str
-    user_b_expected: str
+    conversations: list
+    prompt: str
+    expected: str
+
+
+class EvaluateRequest(BaseModel):
+    """Request to enclave service for evaluation (room_id only).
+
+    The enclave retrieves user data from its own secure storage.
+    """
+
+    room_id: str
 
 
 class EvaluateResponse(BaseModel):

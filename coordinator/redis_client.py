@@ -86,22 +86,19 @@ class RedisClient:
             value=room.model_dump_json(),
         )
 
-    def upload_user_data(
+    def mark_user_uploaded(
         self,
         room_id: str,
         user_id: UserId,
-        conversations: list,
-        prompt: str,
-        expected: str,
     ) -> bool:
-        """Upload user data to room.
+        """Mark user as having uploaded data (flag only, no actual data stored).
+
+        The actual confidential data is stored directly in the enclave's
+        secure storage, never in Redis.
 
         Args:
             room_id: Room identifier.
             user_id: User identifier (a or b).
-            conversations: Conversation data.
-            prompt: Prompt string.
-            expected: Expected answer.
 
         Returns:
             True if successful, False if room not found.
@@ -110,13 +107,10 @@ class RedisClient:
         if not room:
             return False
 
-        # Update user data.
+        # Update only the uploaded flag.
         user_data = UserData(
             uploaded=True,
             ready=False,
-            conversations=conversations,
-            prompt=prompt,
-            expected=expected,
         )
 
         if user_id == UserId.USER_A:

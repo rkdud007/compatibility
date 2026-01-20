@@ -41,7 +41,11 @@ async def create_room() -> CreateRoomResponse:
 
 @router.post("/{room_id}/upload", response_model=UploadResponse)
 async def upload_data(room_id: str, request: UploadRequest) -> UploadResponse:
-    """Upload user data to room.
+    """Upload user data through coordinator to enclave.
+
+    This endpoint proxies the user's confidential data directly to the enclave's
+    secure storage, then marks the upload flag in Redis. The coordinator never
+    stores the actual confidential data.
 
     Args:
         room_id: Room identifier.
@@ -51,14 +55,49 @@ async def upload_data(room_id: str, request: UploadRequest) -> UploadResponse:
         Success status.
 
     Raises:
-        HTTPException: If room not found.
+        HTTPException: If room not found or enclave upload fails.
     """
-    success = redis_client.upload_user_data(
+    # First, verify room exists.
+    room = redis_client.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    # Forward confidential data to enclave's secure storage.
+    try:
+        from shared.schemas import SecureUploadRequest
+
+        enclave_url = f"{settings.enclave_service_url}/upload/{room_id}/{request.user_id.value}"
+        logger.info(f"Forwarding confidential data to enclave for room={room_id}, user={request.user_id}")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                enclave_url,
+                json=SecureUploadRequest(
+                    conversations=request.conversations,
+                    prompt=request.prompt,
+                    expected=request.expected,
+                ).model_dump(),
+            )
+            response.raise_for_status()
+            logger.info(f"Enclave confirmed secure storage for room={room_id}, user={request.user_id}")
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Enclave rejected upload: {e.response.status_code} - {e.response.text}")
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to store data in secure enclave",
+        )
+    except httpx.RequestError as e:
+        logger.error(f"Failed to connect to enclave: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Enclave service unavailable",
+        )
+
+    # Mark user as uploaded in Redis (flag only, no data).
+    success = redis_client.mark_user_uploaded(
         room_id=room_id,
         user_id=request.user_id,
-        conversations=request.conversations,
-        prompt=request.prompt,
-        expected=request.expected,
     )
 
     if not success:
@@ -69,6 +108,9 @@ async def upload_data(room_id: str, request: UploadRequest) -> UploadResponse:
 
 async def trigger_evaluation(room_id: str) -> None:
     """Trigger enclave evaluation (background task).
+
+    The coordinator sends only the room_id to the enclave.
+    The enclave retrieves confidential data from its own secure storage.
 
     Args:
         room_id: Room identifier.
@@ -85,7 +127,7 @@ async def trigger_evaluation(room_id: str) -> None:
     logger.info(f"Room {room_id} state set to EVALUATING")
 
     try:
-        # Call enclave service.
+        # Call enclave service with only room_id.
         enclave_url = f"{settings.enclave_service_url}/evaluate"
         logger.info(f"Calling enclave service at {enclave_url} for room {room_id}")
 
@@ -93,12 +135,7 @@ async def trigger_evaluation(room_id: str) -> None:
             response = await client.post(
                 enclave_url,
                 json=EvaluateRequest(
-                    user_a_conversations=room.user_a.conversations,
-                    user_a_prompt=room.user_a.prompt,
-                    user_a_expected=room.user_a.expected,
-                    user_b_conversations=room.user_b.conversations,
-                    user_b_prompt=room.user_b.prompt,
-                    user_b_expected=room.user_b.expected,
+                    room_id=room_id,
                 ).model_dump(),
             )
 

@@ -70,15 +70,23 @@ class TestEndToEndFlow:
     ):
         """Test complete flow: create room → upload → ready → evaluate → results."""
 
-        # Mock Redis and OpenAI for isolated test.
+        # Mock Redis, enclave HTTP client, and OpenAI for isolated test.
         with patch("coordinator.routes.rooms.redis_client") as mock_redis, \
+             patch("coordinator.routes.rooms.httpx.AsyncClient") as mock_http_client, \
              patch("enclave.main.evaluator") as mock_evaluator:
 
             # Configure mocks.
             mock_redis.create_room.return_value = "test-room-e2e"
-            mock_redis.upload_user_data.return_value = True
+            mock_redis.get_room.return_value = Mock(room_id="test-room-e2e")
+            mock_redis.mark_user_uploaded.return_value = True
             mock_redis.mark_user_ready.return_value = True
             mock_evaluator.evaluate.return_value = (85, 90)
+
+            # Mock enclave upload response.
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.raise_for_status = Mock()
+            mock_http_client.return_value.__aenter__.return_value.post.return_value = mock_response
 
             # Step 1: User A creates room.
             create_response = coordinator_client.post("/room/create")
@@ -165,16 +173,10 @@ class TestEndToEndFlow:
                 user_a=UserData(
                     uploaded=True,
                     ready=True,
-                    conversations=user_a_conversations,
-                    prompt=user_a_prompt,
-                    expected=user_a_expected,
                 ),
                 user_b=UserData(
                     uploaded=True,
                     ready=True,
-                    conversations=user_b_conversations,
-                    prompt=user_b_prompt,
-                    expected=user_b_expected,
                 ),
             )
             mock_redis.get_room.return_value = mock_room_both_ready
@@ -223,19 +225,27 @@ class TestEndToEndFlow:
         logger.info("Starting end-to-end compatibility test with real conversation data")
         logger.info("=" * 80)
 
-        # Mock Redis and OpenAI for isolated test.
+        # Mock Redis, enclave HTTP client, and OpenAI for isolated test.
         with patch("coordinator.routes.rooms.redis_client") as mock_redis, \
+             patch("coordinator.routes.rooms.httpx.AsyncClient") as mock_http_client, \
              patch("enclave.main.evaluator") as mock_evaluator:
 
             # Configure mocks.
             mock_redis.create_room.return_value = "test-room-real-data"
-            mock_redis.upload_user_data.return_value = True
+            mock_redis.get_room.return_value = Mock(room_id="test-room-real-data")
+            mock_redis.mark_user_uploaded.return_value = True
             mock_redis.mark_user_ready.return_value = True
 
             # Mock evaluation with realistic scores.
             mock_a_to_b_score = 78
             mock_b_to_a_score = 82
             mock_evaluator.evaluate.return_value = (mock_a_to_b_score, mock_b_to_a_score)
+
+            # Mock enclave upload response.
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.raise_for_status = Mock()
+            mock_http_client.return_value.__aenter__.return_value.post.return_value = mock_response
 
             # Step 1: User A creates room.
             logger.info("\n[Step 1] User A creates room")
@@ -331,16 +341,10 @@ class TestEndToEndFlow:
                 user_a=UserData(
                     uploaded=True,
                     ready=True,
-                    conversations=conversations_a,
-                    prompt=user_a_prompt,
-                    expected=user_a_expected,
                 ),
                 user_b=UserData(
                     uploaded=True,
                     ready=True,
-                    conversations=conversations_b,
-                    prompt=user_b_prompt,
-                    expected=user_b_expected,
                 ),
             )
             mock_redis.get_room.return_value = mock_room_both_ready
@@ -399,9 +403,17 @@ class TestEndToEndFlow:
     ):
         """Test that users can upload but evaluation doesn't start until both ready."""
 
-        with patch("coordinator.routes.rooms.redis_client") as mock_redis:
+        with patch("coordinator.routes.rooms.redis_client") as mock_redis, \
+             patch("coordinator.routes.rooms.httpx.AsyncClient") as mock_http_client:
             mock_redis.create_room.return_value = "test-room-waiting"
-            mock_redis.upload_user_data.return_value = True
+            mock_redis.get_room.return_value = Mock(room_id="test-room-waiting")
+            mock_redis.mark_user_uploaded.return_value = True
+
+            # Mock enclave upload response.
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.raise_for_status = Mock()
+            mock_http_client.return_value.__aenter__.return_value.post.return_value = mock_response
 
             # Create room.
             create_response = coordinator_client.post("/room/create")
