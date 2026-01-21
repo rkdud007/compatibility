@@ -1,12 +1,6 @@
 ## Compatibility
 
-A privacy-preserving compatibility scoring system that lets two people evaluate their compatibility using confidential questions, without revealing their questions or answers to each other.
-
-### Research motivation
-
-This project is inspired by the [NDAI paper](https://arxiv.org/abs/2502.07924), which proposes a setting where negotiations are conducted by AI agents on behalf of two parties inside a Trusted Execution Environment (TEE).
-
-We adapt this idea to a dating context: two participants delegate a compatibility "negotiation" to agents running in a TEE, which compute a compatibility score (and optionally a short recap) while keeping raw responses private from the other participant and from the service operator.
+A privacy-preserving compatibility scoring system that lets two people evaluate their compatibility using confidential questions, without revealing their questions or answers to each other. Please also checkout the [research motivation of the project](./RESEARCH.md). 
 
 ### Overview
 
