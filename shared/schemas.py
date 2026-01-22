@@ -29,6 +29,7 @@ class UserData(BaseModel):
     only in the enclave's secure storage, never in Redis.
     """
 
+    username: Optional[str] = None
     uploaded: bool = False
     ready: bool = False
 
@@ -63,7 +64,8 @@ class CreateRoomResponse(BaseModel):
 class UploadRequest(BaseModel):
     """Request to upload user data."""
 
-    user_id: UserId
+    username: str
+    password: str
     conversations: list
     prompt: str
     expected: str
@@ -79,7 +81,8 @@ class UploadResponse(BaseModel):
 class ReadyRequest(BaseModel):
     """Request to mark user as ready."""
 
-    user_id: UserId
+    username: str
+    password: str
 
 
 class ReadyResponse(BaseModel):
@@ -95,6 +98,8 @@ class StatusResponse(BaseModel):
     state: RoomState
     user_a_ready: bool
     user_b_ready: bool
+    user_a_username: Optional[str] = None
+    user_b_username: Optional[str] = None
     result: Optional[EvaluationResult] = None
 
 

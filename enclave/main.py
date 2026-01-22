@@ -2,6 +2,7 @@
 
 import logging
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from shared.schemas import (
     EvaluateRequest,
     EvaluateResponse,
@@ -25,6 +26,15 @@ app = FastAPI(
     title="Compatibility Enclave Service",
     description="Secure evaluation service (trusted component - runs in TEE)",
     version="0.1.0",
+)
+
+# CORS middleware for frontend access.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, restrict to frontend domain.
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize evaluator and secure storage.

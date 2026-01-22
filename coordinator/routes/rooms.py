@@ -55,19 +55,22 @@ async def upload_data(room_id: str, request: UploadRequest) -> UploadResponse:
         Success status.
 
     Raises:
-        HTTPException: If room not found or enclave upload fails.
+        HTTPException: If room not found, room full, or enclave upload fails.
     """
-    # First, verify room exists.
-    room = redis_client.get_room(room_id)
-    if not room:
-        raise HTTPException(status_code=404, detail="Room not found")
+    # First, verify room exists and get/assign user_id.
+    user_id = redis_client.get_or_assign_user_id(room_id, request.username)
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Room not found or room is full (max 2 users)",
+        )
 
     # Forward confidential data to enclave's secure storage.
     try:
         from shared.schemas import SecureUploadRequest
 
-        enclave_url = f"{settings.enclave_service_url}/upload/{room_id}/{request.user_id.value}"
-        logger.info(f"Forwarding confidential data to enclave for room={room_id}, user={request.user_id}")
+        enclave_url = f"{settings.enclave_service_url}/upload/{room_id}/{user_id.value}"
+        logger.info(f"Forwarding confidential data to enclave for room={room_id}, username={request.username}, user_id={user_id}")
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -79,7 +82,7 @@ async def upload_data(room_id: str, request: UploadRequest) -> UploadResponse:
                 ).model_dump(),
             )
             response.raise_for_status()
-            logger.info(f"Enclave confirmed secure storage for room={room_id}, user={request.user_id}")
+            logger.info(f"Enclave confirmed secure storage for room={room_id}, username={request.username}")
 
     except httpx.HTTPStatusError as e:
         logger.error(f"Enclave rejected upload: {e.response.status_code} - {e.response.text}")
@@ -95,13 +98,14 @@ async def upload_data(room_id: str, request: UploadRequest) -> UploadResponse:
         )
 
     # Mark user as uploaded in Redis (flag only, no data).
-    success = redis_client.mark_user_uploaded(
+    assigned_user_id = redis_client.mark_user_uploaded(
         room_id=room_id,
-        user_id=request.user_id,
+        username=request.username,
+        password=request.password,
     )
 
-    if not success:
-        raise HTTPException(status_code=404, detail="Room not found")
+    if not assigned_user_id:
+        raise HTTPException(status_code=400, detail="Failed to assign user slot")
 
     return UploadResponse(success=True, message="Data uploaded successfully")
 
@@ -185,7 +189,7 @@ async def mark_ready(
 
     Args:
         room_id: Room identifier.
-        request: Ready request with user ID.
+        request: Ready request with username and password.
         background_tasks: FastAPI background tasks.
 
     Returns:
@@ -194,10 +198,13 @@ async def mark_ready(
     Raises:
         HTTPException: If room not found or user hasn't uploaded data.
     """
-    success = redis_client.mark_user_ready(room_id=room_id, user_id=request.user_id)
+    success = redis_client.mark_user_ready(room_id=room_id, username=request.username)
 
     if not success:
-        raise HTTPException(status_code=400, detail="Room not found or user hasn't uploaded data")
+        raise HTTPException(
+            status_code=400,
+            detail="Room not found, user not found, or user hasn't uploaded data",
+        )
 
     # Check if both users are ready and trigger evaluation.
     if redis_client.both_users_ready(room_id):
@@ -228,6 +235,8 @@ async def get_status(room_id: str) -> StatusResponse:
         state=room.state,
         user_a_ready=room.user_a.ready,
         user_b_ready=room.user_b.ready,
+        user_a_username=room.user_a.username,
+        user_b_username=room.user_b.username,
         result=room.result,
     )
 

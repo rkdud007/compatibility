@@ -86,11 +86,41 @@ class RedisClient:
             value=room.model_dump_json(),
         )
 
+    def get_or_assign_user_id(self, room_id: str, username: str) -> Optional[UserId]:
+        """Get existing user_id for username, or assign user_a/user_b slot.
+
+        Args:
+            room_id: Room identifier.
+            username: User's username.
+
+        Returns:
+            UserId (USER_A or USER_B) if successful, None if room full.
+        """
+        room = self.get_room(room_id)
+        if not room:
+            return None
+
+        # Check if user already has a slot.
+        if room.user_a.username == username:
+            return UserId.USER_A
+        if room.user_b.username == username:
+            return UserId.USER_B
+
+        # Assign new slot.
+        if room.user_a.username is None:
+            return UserId.USER_A
+        elif room.user_b.username is None:
+            return UserId.USER_B
+        else:
+            # Room is full.
+            return None
+
     def mark_user_uploaded(
         self,
         room_id: str,
-        user_id: UserId,
-    ) -> bool:
+        username: str,
+        password: str,
+    ) -> Optional[UserId]:
         """Mark user as having uploaded data (flag only, no actual data stored).
 
         The actual confidential data is stored directly in the enclave's
@@ -98,17 +128,24 @@ class RedisClient:
 
         Args:
             room_id: Room identifier.
-            user_id: User identifier (a or b).
+            username: User's username.
+            password: User's password (stored for client-side validation).
 
         Returns:
-            True if successful, False if room not found.
+            UserId if successful, None if room not found or full.
         """
         room = self.get_room(room_id)
         if not room:
-            return False
+            return None
 
-        # Update only the uploaded flag.
+        # Get or assign user_id.
+        user_id = self.get_or_assign_user_id(room_id, username)
+        if not user_id:
+            return None
+
+        # Update user data with username and uploaded flag.
         user_data = UserData(
+            username=username,
             uploaded=True,
             ready=False,
         )
@@ -125,20 +162,29 @@ class RedisClient:
             room.state = RoomState.WAITING_FOR_USERS
 
         self.update_room(room)
-        return True
+        return user_id
 
-    def mark_user_ready(self, room_id: str, user_id: UserId) -> bool:
+    def mark_user_ready(self, room_id: str, username: str) -> bool:
         """Mark user as ready.
 
         Args:
             room_id: Room identifier.
-            user_id: User identifier (a or b).
+            username: User's username.
 
         Returns:
             True if successful, False if room not found or user hasn't uploaded.
         """
         room = self.get_room(room_id)
         if not room:
+            return False
+
+        # Find user by username.
+        user_id = None
+        if room.user_a.username == username:
+            user_id = UserId.USER_A
+        elif room.user_b.username == username:
+            user_id = UserId.USER_B
+        else:
             return False
 
         # Check if user has uploaded data.
